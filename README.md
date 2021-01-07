@@ -1,6 +1,6 @@
 # Home Infrastructure
 
-Modernize your home infrastructure, be a pro!
+Modernize your home infrastructure, like a pro!
 
 *Please read through the entire documentation before starting.*
 
@@ -9,6 +9,7 @@ Modernize your home infrastructure, be a pro!
 - Raspberry Pi 4b, 4GB Ram or better.
 - SSD for boot, Samsung EVO 860 or similar.
 - Optional cooling/case.
+- OC may work nice too!
 
 ![Hardware](https://i.imgur.com/5EJ8jNx.jpg)
 
@@ -105,17 +106,30 @@ All services are now behind a reverse proxy, this script would setup six service
 5. `traefik.home.domain.tld` status of your reverse proxy.
 6. `kibana.home.domain.tld` all your container logs in one place, searchable.
 
+## Starting Up
+
+Once the server is up and running, all of the services will boot up and create their own configs.
+I would recommend reading through each of their documentation to understand their capabilities.
+
+- **HASS:** will load default configs, now you can navigate to integrations and setup all your local
+  hardware
+- **PiHole:** will load default configs, you can setup your favorite block-lists and setup DHCP as
+  well. The service is configured to load DNS-over-HTTPS by default using cloudflared.
+- **Kibana:** You will need to create a new index pattern to view your dashboard. The index patter
+  would be `logstash-*`
+- **Heimdall:** You can upload custom icons and setup links to your services.
+
 ## Saving Configurations permanently
 
-Most of the services will be storing their data in their own docker volumes. But if you decide
-you need to save configurations manually, you can edit the `docker-compose.yaml`:
+Most of the services will be storing data in their own docker volumes. But if you decide
+you need to save configurations manually, you can create:
 
     mkdir -p <app_name-config>
 
-and then in the `volumes:` section for the app replace `app_name-data` with `./app_name-config`.
-Delete the entry from the docker volumes section on the top.
+and then edit `docker-compose.yaml` in the `volumes:` section for the app replace `app_name-data`
+with `./app_name-config`. Delete the entry from the docker volumes section on the top.
 
-> **Note:** Make sure you are not committing secrets in your public repo.
+>**Note:** Make sure you are not committing secrets in your public repo.
 
 ## Removing Double Authentication
 
@@ -197,8 +211,9 @@ different, e.g. Replacing `pihole` with `adguard`:
 
 ## Disclaimer
 
-All of the docker services installed using this script belong to their owners and carry their own
-licenses, the images used here are the last stable build working for `AARCH64` architecture.
+All the services installed using this script are results of hardwork by their respective owners.
+These carry their own licenses, rights and terms. The images used here are the last stable build
+built for `AARCH64` architecture. You can change the versions as you may wish!
 
 |        Service        |                           Project Page                            |                              Documentation                              | Image                                                                                                         |
 |:--------------------: |:----------------------------------------------------------------: |:----------------------------------------------------------------------: |-------------------------------------------------------------------------------------------------------------- |
