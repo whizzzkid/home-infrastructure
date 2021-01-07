@@ -20,14 +20,14 @@ services:
       - PROVIDERS_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - PROVIDERS_GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
       - SECRET=${SECRET_SALT}
-      - COOKIE_DOMAIN=${BS_URL}
-      - AUTH_HOST=auth.${BS_URL}
+      - COOKIE_DOMAIN=${HOME_URL}
+      - AUTH_HOST=auth.${HOME_URL}
       - LOG_LEVEL=${LOG_LEVEL}
       - WHITELIST=${WHITELISTED}
       - LIFETIME=${AUTH_LOGIN_TOKEN_EXPIRY}
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.tfa.rule=Host(`auth.${BS_URL}`)"
+      - "traefik.http.routers.tfa.rule=Host(`auth.${HOME_URL}`)"
       - "traefik.http.routers.tfa.entrypoints=websecure"
       - "traefik.http.routers.tfa.service=tfa"
       - "traefik.http.routers.tfa.tls.certresolver=homeinfra"
@@ -70,11 +70,11 @@ services:
     labels:
       # Dashboard
       - "traefik.enable=true"
-      - "traefik.http.routers.traefik.rule=Host(`traefik.${BS_URL}`)"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.${HOME_URL}`)"
       - "traefik.http.routers.traefik.service=api@internal"
       # Wildcard cert
-      - "traefik.http.routers.traefik.tls.domains[0].main=${BS_URL}"
-      - "traefik.http.routers.traefik.tls.domains[0].sans=*.${BS_URL}"
+      - "traefik.http.routers.traefik.tls.domains[0].main=${HOME_URL}"
+      - "traefik.http.routers.traefik.tls.domains[0].sans=*.${HOME_URL}"
       - "traefik.http.routers.traefik.tls.certresolver=homeinfra"
       # Auth
       - "traefik.http.routers.traefik.entrypoints=websecure"
@@ -108,7 +108,7 @@ services:
       - heimdall_data:/config
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.heimdall.rule=Host(`${BS_URL}`)"
+      - "traefik.http.routers.heimdall.rule=Host(`${HOME_URL}`)"
       - "traefik.http.routers.heimdall.entrypoints=websecure"
       - "traefik.http.services.heimdall.loadbalancer.server.port=80"
       - "traefik.http.routers.heimdall.service=heimdall"
@@ -134,7 +134,7 @@ services:
     labels:
       # Frontend
       - "traefik.enable=true"
-      - "traefik.http.routers.portainer-frontend.rule=Host(`portainer.${BS_URL}`)"
+      - "traefik.http.routers.portainer-frontend.rule=Host(`portainer.${HOME_URL}`)"
       - "traefik.http.routers.portainer-frontend.entrypoints=websecure"
       - "traefik.http.services.portainer-frontend.loadbalancer.server.port=9000"
       - "traefik.http.routers.portainer-frontend.service=portainer-frontend"
@@ -142,7 +142,7 @@ services:
       - "traefik.http.routers.portainer-frontend.middlewares=tfa"
 
       # Edge
-      - "traefik.http.routers.portainer-edge.rule=Host(`edge.${BS_URL}`)"
+      - "traefik.http.routers.portainer-edge.rule=Host(`edge.${HOME_URL}`)"
       - "traefik.http.routers.portainer-edge.entrypoints=websecure"
       - "traefik.http.services.portainer-edge.loadbalancer.server.port=8000"
       - "traefik.http.routers.portainer-edge.service=portainer-edge"
@@ -170,11 +170,11 @@ services:
       - TZ=${TZ}
       - DNS1=127.0.0.1#5053
       - WEB_PORT=8001
-      - VIRTUAL_HOST=pihole.${BS_URL}
+      - VIRTUAL_HOST=pihole.${HOME_URL}
       - WEBPASSWORD=
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.pihole.rule=Host(`pihole.${BS_URL}`)"
+      - "traefik.http.routers.pihole.rule=Host(`pihole.${HOME_URL}`)"
       - "traefik.http.routers.pihole.entrypoints=websecure"
       - "traefik.http.services.pihole.loadbalancer.server.port=8001"
       - "traefik.http.routers.pihole.service=pihole"
@@ -200,7 +200,7 @@ services:
       - TZ=${TZ}
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.hass.rule=Host(`hass.${BS_URL}`)"
+      - "traefik.http.routers.hass.rule=Host(`hass.${HOME_URL}`)"
       - "traefik.http.routers.hass.entrypoints=websecure"
       - "traefik.http.services.hass.loadbalancer.server.port=8123"
       - "traefik.http.routers.hass.service=hass"
@@ -263,7 +263,7 @@ services:
       - traefik
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.kibana.rule=Host(`kibana.${BS_URL}`)"
+      - "traefik.http.routers.kibana.rule=Host(`kibana.${HOME_URL}`)"
       - "traefik.http.routers.kibana.entrypoints=websecure"
       - "traefik.http.services.kibana.loadbalancer.server.port=5601"
       - "traefik.http.routers.kibana.service=kibana"
@@ -302,7 +302,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       - CF_TOKEN=${CF_KEY}
-      - TARGET_DOMAIN=${BS_URL}
+      - TARGET_DOMAIN=${HOME_URL}
       - DOMAIN1=${BASE_URL}
       - DOMAIN1_ZONE_ID=${CF_ZONE}
       - DOMAIN1_PROXIED=false
