@@ -1,38 +1,52 @@
-# home-infrastructure
+# Home Infrastructure
+
 Modernize your home infrastructure, be a pro!
 
+*Please read through the entire documentation before starting.*
 
-# Checklist
+## Recommended Hardware:
+
+- Raspberry Pi 4b, 4GB Ram or better.
+- SSD for boot, Samsung EVO 860 or similar.
+- Optional cooling/case.
+
+![Hardware](https://i.imgur.com/5EJ8jNx.jpg)
+
+## High Level Architecture
+
+![High Level Architecture](https://i.imgur.com/ZL8WrxV.png)
+
+## Checklist
 
 - [x] This setup assumes, you already are in possession of a domain name which will allow you to
       access services in your infrastructure remotely. This could be a free domain as well.
-- [x] Also, you are using Cloudflare as your CDN/DNS provider for the domain, i.e. your domain
+- [x] Also, you are using Cloudflare as your CDN/DNS provider for the given domain, i.e. your domain
       points to Cloudflare's nameservers.
-- [x] Also, you are using [DietPi](https://dietpi.com/) and are logged in with root shell.
-      So all commands are being run as root. I am using `64-bit ArmV8-Buster` image without any
+- [x] Also, you are using [DietPi](https://dietpi.com/) as your OS and are logged in as root.
+      Hence, all commands are being run as root. I am using `64-bit ArmV8-Buster` image without any
       issues. It should work just as well with any other debian based distro.
-- [x] You are able to SSH into the system or use a keyboard and screen.
+- [x] You are able to SSH into the RPi or use a keyboard and screen.
 - [x] You have working knowledge of an editor in the terminal, like `nano` or `vi`
 - [x] This setup also assumes you installed `docker`, you can use `dietpi-software` to install
       `Docker`.
-- [x] You can also install `git`, you can use `dietpi-software` to install `git`.
+- [x] You also installed `git`, you can use `dietpi-software` to install `git` too.
 
 
 ## Setup Instructions
 
 If the above checklist is complete, we can now go on with the next steps:
 
-- Clone this repo:
+- Fork this repo, this will be needed if you plan to save your own configs.
+- Clone the repo you just forked:
     ```bash
-    git clone https://github.com/whizzzkid/home-infrastructure.git && cd home-Infrastructure
+    git clone https://github.com/<user_name>/home-infrastructure.git && cd home-infrastructure
     ```
 - We need `docker-compose` and all the related dependencies which can be installed:
     ```bash
     ./setup.sh
     ```
-- Setup the `.env`
+- Populate the `.env` (this stores all your secrets, hence never committed).
     ```bash
-    cp env.example .env
     nano .env
     ```
 - Fill out all the details:
@@ -63,37 +77,45 @@ If the above checklist is complete, we can now go on with the next steps:
     WHITELISTED='user1@gmail.com,user2@domain.tld'
     AUTH_LOGIN_TOKEN_EXPIRY=2592000
     ```
+
 - Once everything is filled in, just start:
     ```bash
     ./run.sh -v
     ```
+
 - If something does not look right, kill all containers and force rebuild:
     ```bash
     ./run.sh -kv
     ```
 
+## Credentials
+
+- Google specific credentials for log-in, [read this](https://github.com/thomseddon/traefik-forward-auth#provider-setup).
+- Cloudflare specific credentials for DNS updates, [read this](https://github.com/oznu/docker-cloudflare-ddns#creating-a-cloudflare-api-token).
 
 ## Structure.
 
 All services are now behind a reverse proxy, this script would setup six services for you.
 
 1. `home.domain.tld` this is your dashboard, behind Google Auth, you can go in add links to your
-   services however you like them.
+   services however you like them (this has to be done manually)
 2. `pihole.home.domain.tld` this is the pihole web-interface to manage your adblocker.
 3. `hass.home.domain.tld` this is your home automation hub.
 4. `portainer.home.domain.tld` you can manage your containers here.
 5. `traefik.home.domain.tld` status of your reverse proxy.
 6. `kibana.home.domain.tld` all your container logs in one place, searchable.
 
-## Saving Configurations
+## Saving Configurations permanently
 
 Most of the services will be storing their data in their own docker volumes. But if you decide
 you need to save configurations manually, you can edit the `docker-compose.yaml`:
-    ```bash
+
     mkdir -p <app_name-config>
-    ```
+
 and then in the `volumes:` section for the app replace `app_name-data` with `./app_name-config`.
-Delete the entry from the top docker volumes section.
+Delete the entry from the docker volumes section on the top.
+
+> **Note:** Make sure you are not committing secrets in your public repo.
 
 ## Removing Double Authentication
 
@@ -107,8 +129,8 @@ inbuilt authentication settings:
    ```
    do not enter any value, just press return key, this will remove the [login screen for pihole](https://discourse.pi-hole.net/t/how-do-i-set-or-reset-the-web-interface-password/1328).
 
-2. **HASS:** Once hass is up and running, it will populate files in your `hassio` folder. In the
-   `configuration.yaml` add the following lines on the top:
+2. **HASS:** Once hass is up and running, it will populate files in your `hassio` folder. Edit the
+   `hassio/configuration.yaml` file and add the following lines on the top:
     ```yaml
     homeassistant:
         auth_providers:
@@ -117,61 +139,82 @@ inbuilt authentication settings:
                 - 172.18.0.0/24
             allow_bypass_login: true
     ```
-    this bypasses auth for all requests coming via internal docker network. Since this will be
-    going in via Traefik, this should not have additional authentication.
+    this bypasses auth for all requests coming via internal docker network. Since this will be going
+    in via Traefik, this should not have additional authentication.
 
 3. **Portainer:** Portainer does not support forward auth at [this point](https://github.com/portainer/portainer/issues/3893)
 
 ## Adding/Removing Services
 
 You can add more services in the `docker-compose.yaml`. Or replace existing services with something
-different.
+different, e.g. Replacing `pihole` with `adguard`:
 
-1. Replacing `pihole` with `adguard`:
-    - remove the `pihole` entry from `docker-compose.yaml`:
-        ```yaml
-        pihole:
-          container_name: pihole
-          ... more config
-          ... everything.
-        ```
-    - add the `adguard` config:
-        ```yaml
-        adguard:
-            container_name: adguard
-            image: adguard/adguardhome:latest
-            depends_on:
-            - traefik
-            restart: unless-stopped
-            volumes:
-            - adguard_data:/opt/adguardhome/work
-            - ./build/adguard:/opt/adguardhome/conf
-            network_mode: host
-            labels:
-            # Admin
-            - "traefik.enable=true"
-            - "traefik.http.routers.adguard.rule=Host(`adguard.${HOME_URL}`)"
-            - "traefik.http.routers.adguard.entrypoints=websecure"
-            - "traefik.http.services.adguard.loadbalancer.server.port=3333"
-            - "traefik.http.routers.adguard.service=adguard"
-            - "traefik.http.routers.adguard.tls.certresolver=homeinfra"
-            - "traefik.http.routers.adguard.middlewares=tfa"
-            logging:
-            driver: gelf
-            options:
-                gelf-address: udp://localhost:12201
-                tag: "adguard"
-        ```
-    - also create a volume in the global volumes section:
-        ```yaml
-            volumes:
-                ...
-                adguard_data:
-                    name: "adguard_data"
-                ...
-        ```
-    - kill and restart your containers:
+- remove the `pihole` entry from `docker-compose.yaml`:
+    ```yaml
+    pihole:
+        container_name: pihole
+        ... more config
+        ... everything.
+    ```
+- add the `adguard` config:
+    ```yaml
+    adguard:
+        container_name: adguard
+        image: adguard/adguardhome:latest
+        depends_on:
+        - traefik
+        restart: unless-stopped
+        volumes:
+        - adguard_data:/opt/adguardhome/work
+        - ./build/adguard:/opt/adguardhome/conf
+        network_mode: host
+        labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.adguard.rule=Host(`adguard.${HOME_URL}`)"
+        - "traefik.http.routers.adguard.entrypoints=websecure"
+        - "traefik.http.services.adguard.loadbalancer.server.port=3333"
+        - "traefik.http.routers.adguard.service=adguard"
+        - "traefik.http.routers.adguard.tls.certresolver=homeinfra"
+        - "traefik.http.routers.adguard.middlewares=tfa"
+        logging:
+        driver: gelf
+        options:
+            gelf-address: udp://localhost:12201
+            tag: "adguard"
+    ```
+- also create a volume in the global volumes section:
+    ```yaml
+        volumes:
+            ...
+            adguard_data:
+                name: "adguard_data"
+            ...
+    ```
+- kill and restart your containers:
     ``` bash
     ./run.sh -kv
     ```
+
+## Disclaimer
+
+All of the docker services installed using this script belong to their owners and carry their own
+licenses, the images used here are the last stable build working for `AARCH64` architecture.
+
+|        Service        |                           Project Page                            |                              Documentation                              | Image                                                                                                         |
+|:--------------------: |:----------------------------------------------------------------: |:----------------------------------------------------------------------: |-------------------------------------------------------------------------------------------------------------- |
+| Traefik               | https://github.com/traefik/traefik                                | https://doc.traefik.io/traefik/                                         | traefik:v2.3.6                                                                                                |
+| TFA                   | https://github.com/thomseddon/traefik-forward-auth                | https://github.com/thomseddon/traefik-forward-auth                      | npawelek/traefik-forward-auth:latest                                                                          |
+| Portainer             | https://github.com/portainer/portainer                            | https://documentation.portainer.io/                                     | portainer/portainer-ce:2.0.1                                                                                  |
+| Cloudflared           | https://github.com/cloudflare/cloudflared                         | https://developers.cloudflare.com/argo-tunnel/                          | crazymax/cloudflared:latest                                                                                   |
+| Cloudflare-Companion  | https://github.com/tiredofit/docker-traefik-cloudflare-companion  | https://github.com/tiredofit/docker-traefik-cloudflare-companion        | docker.pkg.github.com/jwillmer/docker-traefik-cloudflare-companion/docker-traefik-cloudflare-companion:6.1.2  |
+| Cloudflare-DDNS       | https://github.com/oznu/docker-cloudflare-ddns                    | https://github.com/oznu/docker-cloudflare-ddns                          | oznu/cloudflare-ddns:latest                                                                                   |
+| Heimdall              | https://github.com/linuxserver/Heimdall                           | https://heimdall.site/                                                  | ghcr.io/linuxserver/heimdall                                                                                  |
+| PiHole                | https://github.com/pi-hole/pi-hole                                | https://docs.pi-hole.net/                                               | pihole/pihole:latest                                                                                          |
+| Home Assistant        | https://github.com/home-assistant/core                            | https://www.home-assistant.io/docs/                                     | homeassistant/raspberrypi4-64-homeassistant:stable                                                            |
+| Elasticsearch         | https://github.com/elastic/elasticsearch                          | https://www.elastic.co/guide/en/elasticsearch/reference/7.x/index.html  | elasticsearch:7.9.3                                                                                           |
+| Logstash              | https://github.com/elastic/logstash                               | https://www.elastic.co/guide/en/logstash/7.x/index.html                 | raquette/logstash-oss:7.9.3                                                                                   |
+| Kibana                | https://github.com/elastic/kibana                                 | https://www.elastic.co/guide/en/kibana/7.x/index.html                   | raquette/kibana-oss:7.9.3                                                                                     |
+
+## License
+MIT
 
