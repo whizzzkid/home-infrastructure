@@ -1,0 +1,328 @@
+version: "3.3"
+
+volumes:
+  portainer_data:
+    name: "portainer_data"
+  elasticsearch_data:
+    name: "elasticsearch_data"
+
+services:
+  # Authentication
+  tfa:
+    container_name: tfa
+    image: npawelek/traefik-forward-auth:latest
+    restart: unless-stopped
+    environment:
+      - PROVIDERS_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - PROVIDERS_GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - SECRET=${SECRET_SALT}
+      - COOKIE_DOMAIN=${BS_URL}
+      - AUTH_HOST=auth.${BS_URL}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - WHITELIST=${WHITELISTED}
+      - LIFETIME=${AUTH_LOGIN_TOKEN_EXPIRY}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tfa.rule=Host(`auth.${BS_URL}`)"
+      - "traefik.http.routers.tfa.entrypoints=websecure"
+      - "traefik.http.routers.tfa.service=tfa"
+      - "traefik.http.routers.tfa.tls.certresolver=homeinfra"
+      - "traefik.http.middlewares.tfa.forwardauth.address=http://tfa:4181"
+      - "traefik.http.middlewares.tfa.forwardauth.authResponseHeaders=X-Forwarded-User"
+      - "traefik.http.services.tfa.loadbalancer.server.port=4181"
+      - "traefik.http.routers.tfa.middlewares=tfa"
+    logging:
+      driver: gelf
+      options:
+        gelf-address: udp://localhost:12201
+        tag: "tfa"
+
+  # Reverse Proxy
+  traefik:
+    container_name: traefik
+    image: traefik:v2.3.6
+    depends_on:
+      - tfa
+    restart: unless-stopped
+    environment:
+      - CLOUDFLARE_DNS_API_TOKEN=${CF_KEY}
+    command:
+      - --log.level=${LOG_LEVEL}
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --providers.docker
+      - --api.insecure=false
+      - --certificatesresolvers.homeinfra.acme.caserver=https://acme-v02.api.letsencrypt.org/directory
+      - --certificatesresolvers.homeinfra.acme.email=${CF_EMAIL}
+      - --certificatesresolvers.homeinfra.acme.storage=/acme.json
+      - --certificatesresolvers.homeinfra.acme.dnschallenge=true
+      - --certificatesresolvers.homeinfra.acme.dnschallenge.provider=cloudflare
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./acme.json:/acme.json"
+      - "./secret-users:/secret-users"
+    labels:
+      # Dashboard
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.${BS_URL}`)"
+      - "traefik.http.routers.traefik.service=api@internal"
+      # Wildcard cert
+      - "traefik.http.routers.traefik.tls.domains[0].main=${BS_URL}"
+      - "traefik.http.routers.traefik.tls.domains[0].sans=*.${BS_URL}"
+      - "traefik.http.routers.traefik.tls.certresolver=homeinfra"
+      # Auth
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.middlewares=tfa"      
+      # global redirect to https
+      - "traefik.http.routers.http-catchall.rule=hostregexp(`{host:.+}`)"
+      - "traefik.http.routers.http-catchall.entrypoints=web"
+      - "traefik.http.routers.http-catchall.middlewares=redirect-to-https"
+      # middleware redirect
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+    extra_hosts:
+      - host.docker.internal:172.17.0.1
+    logging:
+      driver: gelf
+      options:
+        gelf-address: udp://localhost:12201
+        tag: "traefik"
+
+  # Dashboard
+  heimdall:
+    container_name: heimdall
+    image: ghcr.io/linuxserver/heimdall
+    depends_on:
+      - traefik
+    restart: unless-stopped
+    environment:
+      - PUID=${PUID}
+      - PGID=${PGID}
+      - TZ=${TZ}
+    volumes:
+      - ./heimdall:/config
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.heimdall.rule=Host(`${BS_URL}`)"
+      - "traefik.http.routers.heimdall.entrypoints=websecure"
+      - "traefik.http.services.heimdall.loadbalancer.server.port=80"
+      - "traefik.http.routers.heimdall.service=heimdall"
+      - "traefik.http.routers.heimdall.tls.certresolver=homeinfra"
+      - "traefik.http.routers.heimdall.middlewares=tfa"
+    logging:
+      driver: gelf
+      options:
+        gelf-address: udp://localhost:12201
+        tag: "heimdall"
+
+  # Container control
+  portainer:
+    container_name: portainer
+    image: portainer/portainer-ce:2.0.1
+    depends_on:
+      - traefik
+    command: -H unix:///var/run/docker.sock
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - portainer_data:/data
+    labels:
+      # Frontend
+      - "traefik.enable=true"
+      - "traefik.http.routers.portainer-frontend.rule=Host(`portainer.${BS_URL}`)"
+      - "traefik.http.routers.portainer-frontend.entrypoints=websecure"
+      - "traefik.http.services.portainer-frontend.loadbalancer.server.port=9000"
+      - "traefik.http.routers.portainer-frontend.service=portainer-frontend"
+      - "traefik.http.routers.portainer-frontend.tls.certresolver=homeinfra"
+      - "traefik.http.routers.portainer-frontend.middlewares=tfa"
+
+      # Edge
+      - "traefik.http.routers.portainer-edge.rule=Host(`edge.${BS_URL}`)"
+      - "traefik.http.routers.portainer-edge.entrypoints=websecure"
+      - "traefik.http.services.portainer-edge.loadbalancer.server.port=8000"
+      - "traefik.http.routers.portainer-edge.service=portainer-edge"
+      - "traefik.http.routers.portainer-edge.tls.certresolver=homeinfra"
+      - "traefik.http.routers.portainer-edge.middlewares=tfa"
+    logging:
+      driver: gelf
+      options:
+        gelf-address: udp://localhost:12201
+        tag: "portainer"
+
+  # AdBlocking
+  pihole:
+    container_name: pihole
+    depends_on:
+      - cloudflared
+    restart: unless-stopped
+    image: pihole/pihole:latest
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+    volumes:
+      - "./pihole/config/:/etc/pihole/"
+      - "./pihole/dnsmasq/:/etc/dnsmasq.d/"
+    environment:
+      - TZ=${TZ}
+      - DNS1=127.0.0.1#5053
+      - WEB_PORT=8001
+      - VIRTUAL_HOST=pihole.${BS_URL}
+      - WEBPASSWORD=
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.pihole.rule=Host(`pihole.${BS_URL}`)"
+      - "traefik.http.routers.pihole.entrypoints=websecure"
+      - "traefik.http.services.pihole.loadbalancer.server.port=8001"
+      - "traefik.http.routers.pihole.service=pihole"
+      - "traefik.http.routers.pihole.tls.certresolver=homeinfra"
+      - "traefik.http.routers.pihole.middlewares=tfa"
+    logging:
+      driver: gelf
+      options:
+        gelf-address: udp://localhost:12201
+        tag: "pihole"
+
+  # Home Automation.
+  homeassistant:
+    container_name: hass
+    image: homeassistant/raspberrypi4-64-homeassistant:stable
+    restart: unless-stopped
+    depends_on:
+      - traefik
+    volumes:
+      - ./hassio:/config
+    network_mode: host
+    environment:
+      - TZ=${TZ}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.hass.rule=Host(`hass.${BS_URL}`)"
+      - "traefik.http.routers.hass.entrypoints=websecure"
+      - "traefik.http.services.hass.loadbalancer.server.port=8123"
+      - "traefik.http.routers.hass.service=hass"
+      - "traefik.http.routers.hass.tls.certresolver=homeinfra"
+      - "traefik.http.routers.hass.middlewares=tfa"
+    logging:
+      driver: gelf
+      options:
+        gelf-address: udp://localhost:12201
+        tag: "hass"
+  
+  # ELK - Stack
+  elasticsearch:
+    container_name: elastic
+    image: elasticsearch:7.9.3
+    restart: unless-stopped
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - 9200:9200
+    logging:
+      driver: gelf
+      options:
+        gelf-address: udp://localhost:12201
+        tag: "elastic"
+
+  logstash:
+    container_name: logs
+    image: raquette/logstash-oss:7.9.3
+    restart: unless-stopped
+    links:
+      - elasticsearch
+    volumes:
+      - ./logstash:/etc/logstash
+    environment:
+      - "LS_JAVA_OPTS=-Xms512m -Xmx512m"
+    command: logstash -f /etc/logstash/logstash.conf
+    ports:
+      - 12201:12201/udp
+    depends_on:
+      - elasticsearch
+    logging:
+      driver: gelf
+      options:
+        gelf-address: udp://localhost:12201
+        tag: "logstash"
+
+  kibana:
+    container_name: kibana
+    image: raquette/kibana-oss:7.9.3
+    restart: unless-stopped
+    ports:
+      - 5601:5601
+    depends_on:
+      - elasticsearch
+      - logstash
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.kibana.rule=Host(`kibana.${BS_URL}`)"
+      - "traefik.http.routers.kibana.entrypoints=websecure"
+      - "traefik.http.services.kibana.loadbalancer.server.port=5601"
+      - "traefik.http.routers.kibana.service=kibana"
+      - "traefik.http.routers.kibana.tls.certresolver=homeinfra"
+      - "traefik.http.routers.kibana.middlewares=tfa"
+    logging:
+      driver: gelf
+      options:
+        gelf-address: udp://localhost:12201
+        tag: "kibana"
+
+  # Un-proxied services
+  # DDNS, let CF know which IP to send traffic to.
+  cloudflare-ddns:
+    container_name: ddns
+    image: oznu/cloudflare-ddns:latest
+    restart: unless-stopped
+    environment:
+      - API_KEY=${CF_KEY}
+      - ZONE=${BASE_URL}
+      - SUBDOMAIN=${SUBDOMAIN}
+      - PROXIED=false
+    volumes:
+      - "./secrets:/secrets"
+    logging:
+      driver: gelf
+      options:
+        gelf-address: udp://localhost:12201
+        tag: "CF-DDNS"
+
+  # This service, adds all subdomains to cloudflare. service.home.domain.tld
+  cloudflare-companion:
+    container_name: cloudflare
+    image: docker.pkg.github.com/jwillmer/docker-traefik-cloudflare-companion/docker-traefik-cloudflare-companion:6.1.2
+    depends_on:
+      - traefik
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      - CF_TOKEN=${CF_KEY}
+      - TARGET_DOMAIN=${BS_URL}
+      - DOMAIN1=${BASE_URL}
+      - DOMAIN1_ZONE_ID=${CF_ZONE}
+      - DOMAIN1_PROXIED=false
+    restart: unless-stopped
+    logging:
+      driver: gelf
+      options:
+        gelf-address: udp://localhost:12201
+        tag: "cf-companion"
+
+  # DNS over HTTPS using Cloudflare.
+  cloudflared:
+    container_name: cloudflared
+    image: crazymax/cloudflared:latest
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      - TZ=${TZ}
+    logging:
+      driver: gelf
+      options:
+        gelf-address: udp://localhost:12201
+        tag: "cloudflared"
