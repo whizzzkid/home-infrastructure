@@ -5,6 +5,10 @@ volumes:
     name: "portainer_data"
   elasticsearch_data:
     name: "elasticsearch_data"
+  heimdall_data:
+    name: "heimdall_data"
+  pihole_data:
+    name: "pihole_data"
 
 services:
   # Authentication
@@ -63,7 +67,6 @@ services:
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
       - "./acme.json:/acme.json"
-      - "./secret-users:/secret-users"
     labels:
       # Dashboard
       - "traefik.enable=true"
@@ -102,7 +105,7 @@ services:
       - PGID=${PGID}
       - TZ=${TZ}
     volumes:
-      - ./heimdall:/config
+      - heimdall_data:/config
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.heimdall.rule=Host(`${BS_URL}`)"
@@ -162,8 +165,7 @@ services:
     cap_add:
       - NET_ADMIN
     volumes:
-      - "./pihole/config/:/etc/pihole/"
-      - "./pihole/dnsmasq/:/etc/dnsmasq.d/"
+      - pihole_data:/etc
     environment:
       - TZ=${TZ}
       - DNS1=127.0.0.1#5053
@@ -284,8 +286,6 @@ services:
       - ZONE=${BASE_URL}
       - SUBDOMAIN=${SUBDOMAIN}
       - PROXIED=false
-    volumes:
-      - "./secrets:/secrets"
     logging:
       driver: gelf
       options:
