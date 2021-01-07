@@ -4,10 +4,18 @@ Modernize your home infrastructure, like a pro!
 
 *Please read through the entire documentation before starting.*
 
+## Capabilities
+
+- Run local infrastructure in docker containers for easier upgrades and robustness.
+- Add home automation and network wide ad-block.
+- Expose local services externally in a secure way.
+- Authentication using Google OAuth.
+- ELK stack for log monitoring and search.
+
 ## Recommended Hardware:
 
 - Raspberry Pi 4b, 4GB Ram or better.
-- SSD for boot, Samsung EVO 860 or similar.
+- SSD for boot, Samsung EVO 860 or similar. MicroSD will wear out quickly!
 - Optional cooling/case.
 - OC may work nice too!
 
@@ -23,10 +31,12 @@ Modernize your home infrastructure, like a pro!
       access services in your infrastructure remotely. This could be a free domain as well.
 - [x] Also, you are using Cloudflare as your CDN/DNS provider for the given domain, i.e. your domain
       points to Cloudflare's nameservers.
+- [x] Have a router capable of setting up NAT server/routes.
 - [x] Also, you are using [DietPi](https://dietpi.com/) as your OS and are logged in as root.
       Hence, all commands are being run as root. I am using `64-bit ArmV8-Buster` image without any
       issues. It should work just as well with any other debian based distro.
 - [x] You are able to SSH into the RPi or use a keyboard and screen.
+- [x] Setup `DietPi` to use a static IP (say, 192.168.0.10)
 - [x] You have working knowledge of an editor in the terminal, like `nano` or `vi`
 - [x] This setup also assumes you installed `docker`, you can use `dietpi-software` to install
       `Docker`.
@@ -94,7 +104,7 @@ If the above checklist is complete, we can now go on with the next steps:
 - Google specific credentials for log-in, [read this](https://github.com/thomseddon/traefik-forward-auth#provider-setup).
 - Cloudflare specific credentials for DNS updates, [read this](https://github.com/oznu/docker-cloudflare-ddns#creating-a-cloudflare-api-token).
 
-## Structure.
+## URL Structure
 
 All services are now behind a reverse proxy, this script would setup six services for you.
 
@@ -105,6 +115,19 @@ All services are now behind a reverse proxy, this script would setup six service
 4. `portainer.home.domain.tld` you can manage your containers here.
 5. `traefik.home.domain.tld` status of your reverse proxy.
 6. `kibana.home.domain.tld` all your container logs in one place, searchable.
+
+## Network Configuration:
+
+- Go to your router settings page, add a NAT route:
+    ```bash
+    Service Type: HTTPS
+    External Port: 443
+    Internal IP: 192.168.0.10 (RPi's IP address)
+    Internal Port: 443
+    Protocol: TCP
+    ```
+
+- In your cloudflare settings panel, change SSL config to `Full SSL`
 
 ## Starting Up
 
