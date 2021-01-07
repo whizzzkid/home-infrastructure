@@ -11,6 +11,10 @@ Modernize your home infrastructure, like a pro!
 - Expose local services externally in a secure way.
 - Authentication using Google OAuth.
 - ELK stack for log monitoring and search.
+- Automatic SSL generation using LetsEncrypt Acme.
+- Run hassio addons in a supervised environment.
+- Access smart home features from anywhere in the world.
+- Add plenty of other services from https://www.reddit.com/r/selfhosted fast and secure.
 
 ## Recommended Hardware:
 
@@ -122,7 +126,7 @@ All services are now behind a reverse proxy, this script would setup six service
     ```bash
     Service Type: HTTPS
     External Port: 443
-    Internal IP: 192.168.0.10 (RPi's IP address)
+    Internal IP: 192.168.0.10 (RPi IP address)
     Internal Port: 443
     Protocol: TCP
     ```
