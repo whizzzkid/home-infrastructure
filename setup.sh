@@ -36,3 +36,4 @@ apt-get install -y              \
 
 pip3 -v install docker-compose;
 touch ./acme.json && chmod 600 ./acme.json
+cp env.example .env
