@@ -4,6 +4,24 @@ Modernize your home infrastructure, like a pro!
 
 *Please read through the entire documentation before starting.*
 
+<!-- TOC -->
+- [Capabilities](#capabilities)
+- [Recommended Hardware:](#recommended-hardware)
+- [High Level Architecture](#high-level-architecture)
+- [Checklist](#checklist)
+- [Setup Instructions](#setup-instructions)
+- [Credentials](#credentials)
+- [URL Structure](#url-structure)
+- [Network Configuration:](#network-configuration)
+- [Starting Up](#starting-up)
+- [Saving Configurations permanently](#saving-configurations-permanently)
+- [Removing Double Authentication](#removing-double-authentication)
+- [Adding/Removing Services](#addingremoving-services)
+- [Disclaimer](#disclaimer)
+- [License](#license)
+<!-- /TOC -->
+
+
 ## Capabilities
 
 - Run local infrastructure in docker containers for easier upgrades and robustness.
